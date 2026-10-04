@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.example.mp3sync</string>
+  <key>ProgramArguments</key>
+  <array><string>/bin/bash</string><string>/Users/you/bin/mp3sync.sh</string></array>
+  <key>StartOnMount</key><true/>
+  <key>StandardOutPath</key><string>/Users/you/Library/Logs/mp3sync.log</string>
+  <key>StandardErrorPath</key><string>/Users/you/Library/Logs/mp3sync.log</string>
+</dict>
+</plist>

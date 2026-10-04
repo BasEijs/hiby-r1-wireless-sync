@@ -1,0 +1,47 @@
+# The sync server. Copy .env.example to .env, fill it in, then:
+#
+#   docker compose up -d --build
+#
+# The web UI is then on http://<this host>:8787/. See README.md.
+services:
+  mp3sync:
+    build: .
+    # Or use an image built by .github/workflows/mp3sync-image.yml:
+    # image: ghcr.io/<your-github-user>/mp3sync:latest
+    container_name: mp3sync
+    restart: unless-stopped
+    environment:
+      - PLAYER=${PLAYER:?set PLAYER in .env}
+      - MUSIC_SRC=/srv/music
+      - POD_SRC=/srv/podcasts
+      - MAX_DAYS=${MAX_DAYS:-21}
+      - KEEP_MIN=${KEEP_MIN:-2}
+      - MODIFY_WINDOW=2        # exFAT timestamps have 2s granularity
+      - POLL_INTERVAL=30
+      - COOLDOWN=900           # auto-trigger at most once per 15 min
+      # 0 = never sync merely because the player appeared on the network.
+      # The player asks for syncs itself (docs/08-triggering.md).
+      - AUTO_SYNC=${AUTO_SYNC:-0}
+      - PODGRAB_URL=${PODGRAB_URL:-http://podgrab:8080}
+      # Home Assistant push notifications - optional. HA_TOKEN never reaches
+      # the web UI. Which events notify is set in the UI (bell icon).
+      - HA_URL=${HA_URL:-}
+      - HA_TOKEN=${HA_TOKEN:-}
+      - HA_SERVICE=${HA_SERVICE:-notify.notify}
+      - PUBLIC_URL=${PUBLIC_URL:-}   # tapping a notification opens this
+      - TZ=${TZ:-UTC}
+    volumes:
+      # Sources are read-only: this container only ever reads them, so it
+      # cannot damage a library other apps (Plex, Navidrome...) also use.
+      - ${MUSIC_DIR:?set MUSIC_DIR in .env}:/srv/music:ro
+      - ${PODCAST_DIR:?set PODCAST_DIR in .env}:/srv/podcasts:ro
+      - ${STATE_DIR:-./state}:/config
+    ports:
+      - "8787:8787"            # the player's wget trigger hits this
+
+# To reach Podgrab by container name, join its network instead:
+#
+# networks:
+#   default:
+#     external: true
+#     name: <podgrab's network>

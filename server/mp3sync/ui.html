@@ -1,0 +1,683 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f4f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="R1 Sync">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%235b5bd6'/%3E%3Cpath d='M11 22V11l12-2v11' stroke='white' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='9' cy='22' r='2.6' fill='white'/%3E%3Ccircle cx='21' cy='20' r='2.6' fill='white'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>R1 Sync</title>
+<style>
+:root{
+  --bg:#f4f5f7; --card:#fff; --fg:#14161a; --dim:#6b7080; --faint:#9aa0ad;
+  --line:#e6e8ec; --soft:#f0f1f4;
+  --accent:#5b5bd6; --accent-fg:#fff; --accent-soft:#ececfb;
+  --ok:#18794e; --ok-soft:#e5f5ec; --warn:#ad5700; --warn-soft:#fff1e0;
+  --bad:#cd2b31; --bad-soft:#fdebec; --send:#0b68cb; --send-soft:#e6f0fc;
+  --shadow:0 1px 2px rgba(16,24,40,.04),0 1px 3px rgba(16,24,40,.06);
+  --r:16px;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0f1115; --card:#181b21; --fg:#eceef2; --dim:#9aa1b0; --faint:#6b7282;
+  --line:#262a33; --soft:#1f232a;
+  --accent:#8b8cf5; --accent-fg:#0f1115; --accent-soft:#25264a;
+  --ok:#3dd68c; --ok-soft:#133226; --warn:#ffb224; --warn-soft:#3a2a0e;
+  --bad:#ff6369; --bad-soft:#3b1719; --send:#70b8ff; --send-soft:#12283f;
+  --shadow:none;
+}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font:15px/1.45 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px}
+button{font:inherit;color:inherit}
+svg{flex:none}
+
+/* header */
+header{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--bg) 85%,transparent);
+  backdrop-filter:saturate(1.8) blur(14px);-webkit-backdrop-filter:saturate(1.8) blur(14px);
+  padding-top:env(safe-area-inset-top)}
+.bar{display:flex;align-items:center;gap:12px;height:60px}
+.logo{width:34px;height:34px;border-radius:10px;background:var(--accent);display:grid;place-items:center;color:#fff}
+.title{flex:1;min-width:0}
+.title b{display:block;font-size:17px;letter-spacing:-.01em}
+.title span{display:block;font-size:12px;color:var(--dim)}
+
+.chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 11px;border-radius:999px;
+  font-size:13px;font-weight:600;background:var(--soft);color:var(--dim);white-space:nowrap}
+.chip.up{background:var(--ok-soft);color:var(--ok)}
+.chip.busy{background:var(--accent-soft);color:var(--accent)}
+.chip .d{width:8px;height:8px;border-radius:50%;background:currentColor}
+.chip.up .d{box-shadow:0 0 0 3px color-mix(in srgb,currentColor 25%,transparent)}
+
+/* cards */
+.card{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);
+  border:1px solid var(--line);padding:18px;margin:12px 0}
+.eyebrow{font-size:12px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+.hero{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:4px 0 14px}
+.big{font-size:30px;font-weight:700;letter-spacing:-.02em;line-height:1.1}
+.muted{color:var(--dim)} .small{font-size:13px}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;font-size:13px;font-weight:600}
+.badge.ok{background:var(--ok-soft);color:var(--ok)}
+.badge.bad{background:var(--bad-soft);color:var(--bad)}
+.badge.warn{background:var(--warn-soft);color:var(--warn)}
+.badge.idle{background:var(--soft);color:var(--dim)}
+
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:var(--soft);border-radius:12px;padding:10px 12px}
+.stat .k{font-size:12px;color:var(--dim)}
+.stat .v{font-size:15px;font-weight:600;display:flex;gap:10px;flex-wrap:wrap;margin-top:2px}
+.plus{color:var(--send)} .minus{color:var(--bad)} .zero{color:var(--faint);font-weight:500}
+
+/* tabs */
+.tabs{display:flex;gap:4px;padding:4px;background:var(--soft);border-radius:12px;margin:18px 0 4px;
+  border:1px solid var(--line)}
+.tabs button{flex:1;border:0;background:none;padding:9px 6px;border-radius:9px;font-size:14px;font-weight:600;
+  color:var(--dim);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+.tabs button[aria-selected=true]{background:var(--card);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.tabs .n{font-size:11px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--accent);color:var(--accent-fg);
+  display:inline-grid;place-items:center}
+.tabs .n.bad{background:var(--bad);color:#fff}
+.panel[hidden]{display:none}
+
+.head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.head h3{margin:0;font-size:16px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:12px;
+  border:1px solid var(--line);background:var(--card);font-weight:600;cursor:pointer;
+  transition:transform .08s,opacity .2s,background .2s}
+.btn:active:not(:disabled){transform:scale(.97)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.sm{min-height:36px;padding:0 12px;font-size:14px;border-radius:10px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+
+/* lists */
+.section+.section{margin-top:18px;padding-top:18px;border-top:1px solid var(--line)}
+.sechead{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-weight:600}
+.sechead .sp{flex:1}
+.tag{font-size:12px;font-weight:600;padding:2px 8px;border-radius:6px}
+.tag.send{background:var(--send-soft);color:var(--send)}
+.tag.del{background:var(--bad-soft);color:var(--bad)}
+.empty{display:flex;align-items:center;gap:8px;color:var(--dim);padding:6px 0}
+.empty.ok{color:var(--ok)}
+.note{padding:12px 14px;border-radius:12px;font-size:14px;margin-bottom:12px;display:flex;gap:10px;align-items:flex-start}
+.note.bad{background:var(--bad-soft);color:var(--bad)}
+.note.warn{background:var(--warn-soft);color:var(--warn)}
+.note.ok{background:var(--ok-soft);color:var(--ok)}
+.note.info{background:var(--soft);color:var(--dim)}
+.note ul{margin:6px 0 0;padding-left:18px}
+
+details.g{border-radius:12px}
+details.g>summary{list-style:none;display:flex;align-items:center;gap:10px;padding:10px 4px;cursor:pointer;
+  border-radius:10px;min-height:44px}
+details.g>summary::-webkit-details-marker{display:none}
+details.g>summary:hover{background:var(--soft)}
+details.g>summary .chev{color:var(--faint);transition:transform .15s}
+details.g[open]>summary .chev{transform:rotate(90deg)}
+.gname{flex:1;min-width:0}
+.gname b{font-weight:600;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gname span{font-size:12.5px;color:var(--dim);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meta{font-size:12.5px;color:var(--dim);white-space:nowrap}
+.items{list-style:none;margin:0 0 6px 30px;padding:0}
+.items li{padding:6px 0;border-top:1px solid var(--line);font-size:14px;display:flex;gap:8px;align-items:baseline}
+.items li:first-child{border-top:0}
+.items li .t{flex:1;min-width:0;overflow-wrap:anywhere}
+.items li .when{font-size:12px;color:var(--dim);white-space:nowrap}
+details.g details.g{margin-left:22px}
+.dots{display:flex;gap:4px}
+.dots i{width:8px;height:8px;border-radius:50%;background:var(--line)}
+.dots i.on{background:var(--ok)} .dots i.miss{background:var(--bad)}
+.ic{width:18px;text-align:center;font-weight:700}
+.ic.on{color:var(--ok)} .ic.miss{color:var(--bad)} .ic.out{color:var(--faint)}
+
+.search{position:relative;margin-bottom:10px}
+.search input{width:100%;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--soft);
+  padding:0 12px 0 38px;font:inherit;color:inherit;outline:none}
+.search input:focus{border-color:var(--accent);background:var(--card)}
+.search svg{position:absolute;left:12px;top:12px;color:var(--faint)}
+.seg{display:inline-flex;background:var(--soft);border-radius:10px;padding:3px;gap:2px;margin-bottom:10px}
+.seg button{border:0;background:none;padding:6px 12px;border-radius:8px;font-size:13px;font-weight:600;color:var(--dim);cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--card);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+
+/* bottom action bar */
+.actions{position:fixed;left:0;right:0;bottom:0;z-index:10;
+  background:color-mix(in srgb,var(--bg) 85%,transparent);
+  backdrop-filter:saturate(1.8) blur(14px);-webkit-backdrop-filter:saturate(1.8) blur(14px);
+  border-top:1px solid var(--line);padding:10px 0 calc(10px + env(safe-area-inset-bottom))}
+.actions .wrap{display:grid;grid-template-columns:1fr 1.4fr;gap:10px}
+.actions .hint{grid-column:1/-1;font-size:12.5px;color:var(--dim);text-align:center;margin-top:-2px}
+.actions .hint:empty{display:none}
+
+.spin{width:16px;height:16px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;
+  animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.toast{position:fixed;left:50%;bottom:calc(110px + env(safe-area-inset-bottom));transform:translate(-50%,20px);
+  background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;font-weight:500;
+  opacity:0;transition:.2s;pointer-events:none;z-index:20;white-space:nowrap}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.skel{height:14px;border-radius:7px;background:var(--soft);margin:8px 0}
+
+/* notification settings: a sheet from the bottom on phones, a dialog above */
+.iconbtn{width:36px;height:36px;border-radius:10px;border:0;background:var(--soft);color:var(--dim);
+  display:grid;place-items:center;cursor:pointer}
+.iconbtn.off{color:var(--faint)}
+dialog.sheet{border:0;padding:0;margin:auto auto 0;width:100%;max-width:560px;max-height:88vh;
+  border-radius:20px 20px 0 0;background:var(--card);color:var(--fg);box-shadow:0 -8px 40px rgba(0,0,0,.25)}
+dialog.sheet::backdrop{background:rgba(0,0,0,.35)}
+.sheet form{display:flex;flex-direction:column;max-height:88vh}
+.sheet .sh{display:flex;align-items:center;gap:10px;padding:16px 18px 10px;border-bottom:1px solid var(--line)}
+.sheet .sh h3{margin:0;flex:1;font-size:17px}
+.sheet .sb{overflow:auto;padding:4px 18px 8px}
+.sheet .sf{display:flex;gap:10px;padding:12px 18px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
+.sheet .sf .btn{flex:1}
+.grp{margin:14px 0 4px;font-size:12px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+.row{display:flex;align-items:center;gap:12px;min-height:48px;padding:6px 0;border-top:1px solid var(--line)}
+.grp+.row{border-top:0}
+.row .l{flex:1;min-width:0}
+.row .l b{display:block;font-weight:600;font-size:14.5px}
+.row .l span{display:block;font-size:12.5px;color:var(--dim)}
+.row input[type=number]{width:72px}
+.row input[type=number],.row input[type=time],.row select{height:36px;border-radius:9px;border:1px solid var(--line);
+  background:var(--soft);color:inherit;font:inherit;font-size:14px;padding:0 8px}
+.row.dim{opacity:.45}
+.sw{appearance:none;-webkit-appearance:none;width:44px;height:26px;border-radius:13px;background:var(--line);
+  position:relative;cursor:pointer;flex:none;transition:background .15s;margin:0}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;
+  box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform .15s}
+.sw:checked{background:var(--ok)}
+.sw:checked::after{transform:translateX(18px)}
+@media (min-width:640px){dialog.sheet{margin:auto;border-radius:20px}}
+@media (min-width:640px){
+  .wrap{padding:0 24px}
+}
+
+/* Laptop and up: no tabs, no bottom bar. A sticky sidebar holds the last
+   sync and the buttons; every panel is on screen at once. The panels' grid
+   areas are named so the wide layout can rearrange them without new markup. */
+@media (min-width:1024px){
+  body{padding-bottom:32px}
+  .wrap{max-width:1200px}
+  .layout{display:grid;grid-template-columns:340px minmax(0,1fr);column-gap:20px;align-items:start;
+    grid-template-areas:"side music" "side podcasts" "side library"}
+  .side{grid-area:side;position:sticky;top:72px;max-height:calc(100vh - 88px);overflow:auto}
+  .tabs{display:none}
+  .panel[hidden]{display:block}
+  [data-panel=music]{grid-area:music} [data-panel=podcasts]{grid-area:podcasts} [data-panel=library]{grid-area:library}
+  .actions{position:static;background:none;backdrop-filter:none;-webkit-backdrop-filter:none;border:0;padding:0}
+  .actions .wrap{padding:0;grid-template-columns:1fr 1.4fr}
+  .actions .hint{margin-top:2px}
+  .toast{bottom:24px}
+}
+/* Wide screens: the library gets its own column and scrolls on its own. */
+@media (min-width:1360px){
+  .wrap{max-width:1560px}
+  .layout{grid-template-columns:340px minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto 1fr;
+    grid-template-areas:"side music library" "side podcasts library"}
+  .panel[data-panel=library]{position:sticky;top:72px;display:flex;flex-direction:column;max-height:calc(100vh - 88px)}
+  .panel[data-panel=library] #lib{overflow:auto;min-height:0;margin:0 -6px;padding:0 6px}
+}
+</style>
+</head>
+<body>
+<header><div class="wrap bar">
+  <div class="logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3" fill="currentColor"/><circle cx="18" cy="16" r="3" fill="currentColor"/></svg></div>
+  <div class="title"><b>R1 Sync</b><span id="host">HiBy R1</span></div>
+  <span class="chip" id="chip"><span class="d"></span><span>…</span></span>
+  <button class="iconbtn" id="bBell" aria-label="Notifications" title="Notifications"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></button>
+</div></header>
+
+<dialog class="sheet" id="nDlg"><form method="dialog" id="nForm">
+  <div class="sh"><h3>Notifications</h3><button class="btn sm" value="cancel" formnovalidate>Close</button></div>
+  <div class="sb">
+    <div id="nHa"></div>
+    <div class="row"><div class="l"><b>Notifications</b><span>Master switch</span></div><input type="checkbox" class="sw" name="enabled"></div>
+
+    <div class="grp">Syncs</div>
+    <div class="row"><div class="l"><b>Sync finished</b><span>Lists new episodes</span></div>
+      <select name="sync_done"><option value="changes">When something changed</option><option value="always">Always</option><option value="never">Never</option></select></div>
+    <div class="row" data-if="sync_done=changes"><div class="l"><b>Only from</b><span>Files sent or deleted in one sync</span></div><input type="number" name="sync_min_changes" min="1" max="10000"></div>
+    <div class="row"><div class="l"><b>Sync failed</b><span>Urgent</span></div><input type="checkbox" class="sw" name="sync_failed"></div>
+    <div class="row"><div class="l"><b>Large deletion</b><span>Files deleted in one sync · 0 = off · urgent</span></div><input type="number" name="big_delete" min="0" max="10000"></div>
+
+    <div class="grp">Music</div>
+    <div class="row"><div class="l"><b>New music</b><span>An album arrived on the server</span></div><input type="checkbox" class="sw" name="new_music"></div>
+
+    <div class="grp">Podcasts</div>
+    <div class="row"><div class="l"><b>Episodes waiting</b><span>New episodes not on the player yet</span></div><input type="checkbox" class="sw" name="new_episodes"></div>
+    <div class="row" data-if="new_episodes"><div class="l"><b>Only from</b><span>Episodes waiting at once</span></div><input type="number" name="new_episodes_min" min="1" max="10000"></div>
+    <div class="row"><div class="l"><b>Podgrab stuck</b><span>Recent episodes it failed to download</span></div><input type="checkbox" class="sw" name="podgrab_stuck"></div>
+
+    <div class="grp">Player</div>
+    <div class="row"><div class="l"><b>Not seen for</b><span>Days off the network · 0 = off</span></div><input type="number" name="absent_days" min="0" max="365"></div>
+
+    <div class="grp">Quiet hours</div>
+    <div class="row"><div class="l"><b>Quiet hours</b><span>Held messages arrive as one when they end</span></div><input type="checkbox" class="sw" name="quiet"></div>
+    <div class="row" data-if="quiet"><div class="l"><b>From – to</b></div><input type="time" name="quiet_start"><input type="time" name="quiet_end"></div>
+    <div class="row" data-if="quiet"><div class="l"><b>Urgent ones still come</b><span>Failures and large deletions</span></div><input type="checkbox" class="sw" name="quiet_urgent"></div>
+  </div>
+  <div class="sf">
+    <button class="btn" type="button" id="nTest">Send test</button>
+    <button class="btn primary" type="button" id="nSave">Save</button>
+  </div>
+</form></dialog>
+
+<main class="wrap layout">
+  <aside class="side">
+  <section class="card">
+    <div class="eyebrow">Last sync</div>
+    <div class="hero">
+      <div><div class="big" id="lastWhen">–</div><div class="small muted" id="lastAt"></div></div>
+      <span class="badge idle" id="lastBadge">–</span>
+    </div>
+    <div class="stats" id="lastStats"></div>
+    <div id="lastDetail"></div>
+  </section>
+
+  <div class="actions"><div class="wrap">
+    <button class="btn" id="bPreview">Preview</button>
+    <button class="btn primary" id="bSync">Sync now</button>
+    <div class="hint" id="hint"></div>
+  </div></div>
+  </aside>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="music" aria-selected="true">Music <span class="n" id="nMusic">0</span></button>
+    <button role="tab" data-tab="podcasts" aria-selected="false">Podcasts <span class="n" id="nPod">0</span></button>
+    <button role="tab" data-tab="library" aria-selected="false">On player</button>
+  </nav>
+
+  <section class="panel card" data-panel="music">
+    <div class="head"><div><h3>Music</h3><div class="small muted" id="pWhen"></div></div></div>
+    <div id="music"></div>
+  </section>
+
+  <section class="panel card" data-panel="podcasts" hidden>
+    <div class="head">
+      <div><h3>Podcasts</h3><div class="small muted" id="pgWhen"></div></div>
+      <button class="btn sm" id="bFeeds">Check feeds</button>
+    </div>
+    <div id="pg"></div>
+  </section>
+
+  <section class="panel card" data-panel="library" hidden>
+    <div class="head">
+      <div><h3 id="libTotal">On the player</h3><div class="small muted" id="libWhen"></div></div>
+      <button class="btn sm" id="bList">Refresh</button>
+    </div>
+    <div class="seg" id="libSeg">
+      <button data-m="music" aria-pressed="true">Music</button>
+      <button data-m="podcasts" aria-pressed="false">Podcasts</button>
+    </div>
+    <label class="search">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Search artists and albums" autocomplete="off">
+    </label>
+    <div id="lib"></div>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const num = n => Number(n || 0).toLocaleString();
+const size = b => b >= 1e9 ? (b/1e9).toFixed(1)+" GB" : b >= 1e6 ? Math.round(b/1e6)+" MB"
+  : Math.max(1, Math.round(b/1e3))+" kB";
+const ago = s => s == null ? "never" : s < 60 ? "just now" : s < 3600 ? Math.floor(s/60)+" min ago"
+  : s < 86400 ? Math.floor(s/3600)+" h ago" : (d => d === 1 ? "1 day ago" : d+" days ago")(Math.floor(s/86400));
+const stripExt = n => n.replace(/\.(flac|mp3|m4a|aac|ogg|opus|wav|alac)$/i, "");
+const CHEV = '<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
+const CHECK = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+
+/* Replace a region's HTML only when it changed, and keep whatever the user
+   had expanded open. The page re-renders every few seconds (relative ages
+   move), so without this every open folder snaps shut. */
+function patch(el, html) {
+  if (el._html === html) return;
+  el._html = html;
+  const open = new Set([...el.querySelectorAll("details[open]")].map(d => d.dataset.k));
+  el.innerHTML = html;
+  el.querySelectorAll("details").forEach(d => { if (open.has(d.dataset.k)) d.open = true; });
+}
+
+/* Tab badges always show their count: red when there is something for the
+   next sync to do, the calm accent colour at 0. */
+function badge(id, n) {
+  const b = $(id);
+  b.textContent = n > 99 ? "99+" : n;
+  b.classList.toggle("bad", n > 0);
+}
+
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove("show"), 2200);
+}
+
+/* "Artist/Album/Track.flac" -> groups keyed by folder, so a new album reads as
+   one line with 14 tracks under it instead of 14 long paths. */
+function groupPaths(paths) {
+  const g = new Map();
+  for (const p of paths) {
+    const i = p.lastIndexOf("/");
+    const dir = i < 0 ? "" : p.slice(0, i), name = i < 0 ? p : p.slice(i+1);
+    if (!g.has(dir)) g.set(dir, []);
+    g.get(dir).push(name);
+  }
+  return [...g.entries()];
+}
+
+function changeGroups(key, paths, kind) {
+  return groupPaths(paths).map(([dir, names]) => {
+    const parts = dir.split("/"), top = parts[0] || "(top level)", rest = parts.slice(1).join(" / ");
+    return `<details class="g" data-k="${esc(key+kind+dir)}"><summary>${CHEV}
+      <div class="gname"><b>${esc(rest || top)}</b>${rest ? `<span>${esc(top)}</span>` : ""}</div>
+      <span class="tag ${kind}">${kind === "send" ? "+" : "−"}${names.length}</span></summary>
+      <ul class="items">${names.map(n => `<li><span class="t">${esc(stripExt(n))}</span></li>`).join("")}</ul></details>`;
+  }).join("");
+}
+
+/* `done` is set when a successful sync ran after this check: that sync has
+   settled the check's list, so the list is not shown at all (the Last sync
+   card says what was sent). `past` words it as a finished sync rather than
+   a check: "sent" instead of "to send". */
+function changes(key, label, c, done, past) {
+  let body;
+  if (past && c && c.ok === false) body = `<div class="note bad">Failed in this sync.</div>`;
+  else if (past && c && !c.send_total && !c.delete_total) body = `<div class="empty">Nothing changed</div>`;
+  else if (done) body = `<div class="empty ok">${CHECK} Up to date as of the sync ${done.ago}</div>`;
+  else if (!c) body = `<div class="empty">No data</div>`;
+  else if (c.ok === false) body = `<div class="note bad">Could not check — the player was busy or went away. Try again.</div>`;
+  else if (c.ok == null && !c.send_total && !c.delete_total) body = `<div class="empty">Not checked yet</div>`;
+  else if (!c.send_total && !c.delete_total) body = `<div class="empty ok">${CHECK} Up to date</div>`;
+  else body = changeGroups(key, c.send || [], "send") + changeGroups(key, c.delete || [], "del")
+    + (c.truncated ? `<div class="small muted" style="margin-top:6px">List shortened — showing the first ${num((c.send||[]).length)} of each.</div>` : "");
+  const tags = !done && c && (c.send_total || c.delete_total)
+    ? (c.send_total ? `<span class="tag send">${num(c.send_total)} ${past ? "sent" : "to send"}</span>` : "")
+      + (c.delete_total ? `<span class="tag del">${num(c.delete_total)} ${past ? "deleted" : "to delete"}</span>` : "") : "";
+  return `<div class="section">${label ? `<div class="sechead">${label}<span class="sp"></span>${tags}</div>` : ""}${body}</div>`;
+}
+
+function delta(send, del) {
+  send = +send || 0; del = +del || 0;
+  if (!send && !del) return `<span class="zero">no changes</span>`;
+  return (send ? `<span class="plus">+${num(send)}</span>` : "") + (del ? `<span class="minus">−${num(del)}</span>` : "");
+}
+
+function renderLast(s) {
+  const l = s.last_sync;
+  if (!l) { $("#lastWhen").textContent = "Never"; return; }
+  $("#lastWhen").textContent = ago(+l.age_seconds);
+  $("#lastAt").textContent = l.finished || "";
+  const failed = (l.status || "").includes("FAILED");
+  const b = $("#lastBadge");
+  b.className = "badge " + (failed ? "bad" : "ok");
+  b.textContent = failed ? "Failed" : "Success";
+  b.title = l.status || "";
+  patch($("#lastStats"),
+    `<div class="stat"><div class="k">Music</div><div class="v">${delta(l.music_send, l.music_delete)}</div></div>
+     <div class="stat"><div class="k">Podcasts</div><div class="v">${delta(l.pod_send, l.pod_delete)}</div></div>`);
+  const lc = s.last_sync_changes || {};
+  const any = ["music","podcasts"].some(k => lc[k] && (lc[k].send_total || lc[k].delete_total));
+  patch($("#lastDetail"), failed
+    ? `<div class="note bad" style="margin:12px 0 0">${esc(l.status)}</div>`
+    : any ? `<details class="g" data-k="last" style="margin-top:8px"><summary>${CHEV}<div class="gname"><b>What changed</b></div></summary>
+        ${changes("lm", "Music", lc.music, null, true)}${changes("lp", "Podcasts", lc.podcasts, null, true)}</details>` : "");
+}
+
+/* A sync after the last Preview has acted on it. Where that sync succeeded,
+   the Preview's list for that section is settled: rsync compared source and
+   player at sync time and made them match. That is per section - "music ok,
+   podcasts FAILED" settles only music. Returns {ago} when settled, else
+   {failed} when that sync failed for the section, else null. */
+function settledBy(s, k) {
+  const p = s.preview, l = s.last_sync, lc = (s.last_sync_changes || {})[k];
+  if (!p || !l || !(+l.age_seconds < +p.age_seconds) || !lc) return null;
+  if (lc.ok === true) return {ago: ago(+l.age_seconds)};
+  if (lc.ok === false) return {failed: ago(+l.age_seconds)};
+  return null;
+}
+
+/* "Artist/Album" -> an album row. */
+const albumRow = (path, right) => {
+  const i = path.indexOf("/"), a = i < 0 ? path : path.slice(0, i), b = i < 0 ? "" : path.slice(i + 1);
+  return `<li><span class="t">${esc(b || a)}${b ? ` <span class="muted">· ${esc(a)}</span>` : ""}</span><span class="when">${right}</span></li>`;
+};
+
+/* The server's music against the player's last listing is the up-to-date
+   view: it needs no player, so a freshly imported album shows at once. The
+   last Preview is shown underneath only while no sync has settled it. */
+function renderMusic(s) {
+  const p = s.preview, c = (s.preview_changes || {}).music, st = settledBy(s, "music");
+  const mc = s.music_compare || {};
+  const done = st && st.ago ? st : null;
+  if (!mc.device_known) {
+    $("#pWhen").textContent = "What a sync would do · " + (s.running === "preview" ? "checking…" : p ? "checked " + ago(+p.age_seconds) : "not checked yet");
+    patch($("#music"), (st && st.failed ? `<div class="note bad">The sync ${st.failed} failed for music, so this list still applies.</div>` : "")
+      + changes("pm", "", c, done));
+    badge("#nMusic", done || !c ? 0 : (c.send_total || 0) + (c.delete_total || 0));
+    return;
+  }
+
+  $("#pWhen").textContent = "Server now · player as of " + ago(+mc.device_age_seconds);
+  const w = mc.waiting || [], r = mc.removing || [];
+  let h = "";
+  if (w.length) h += `<div class="note warn"><div><b>${w.length} album${w.length > 1 ? "s" : ""} not on the player yet</b></div></div>
+    <ul class="items" style="margin:0 0 12px 4px">${w.map(x => albumRow(x.path,
+      x.new ? `<span class="tag send">new · ${num(x.total)}</span>` : `<span class="tag send">+${num(x.missing)} of ${num(x.total)}</span>`)).join("")}</ul>`;
+  if (r.length) h += `<div class="note info"><div><b>${r.length} album${r.length > 1 ? "s" : ""} the next sync removes</b> — gone from the server</div></div>
+    <ul class="items" style="margin:0 0 12px 4px">${r.map(x => albumRow(x.path, `<span class="tag del">−${num(x.files)}</span>`)).join("")}</ul>`;
+  if (!w.length && !r.length) h += `<div class="note ok">${CHECK}<span>The player has all the music on the server.</span></div>`;
+  if (st && st.failed) h += `<div class="note bad">The last sync (${st.failed}) failed for music.</div>`;
+  if (!done && c && (c.send_total || c.delete_total))
+    h += changes("pm", `Last Preview <span class="small muted" style="font-weight:400">· ${ago(+p.age_seconds)}</span>`, c, null);
+  patch($("#music"), h);
+  badge("#nMusic", w.length + r.length);
+}
+
+function renderPodgrab(s) {
+  const g = s.podgrab;
+  $("#pgWhen").textContent = !g ? "Feeds not checked yet"
+    : "Feeds " + ago(+g.age_seconds) + (g.device_known ? " · player as of " + ago(+g.device_age_seconds) : "");
+  if (!g) return patch($("#pg"), `<div class="empty">Not checked yet</div>`);
+  if (!g.ok) return patch($("#pg"), `<div class="note bad">Could not reach Podgrab — ${esc(g.error)}</div>`);
+
+  let h = "";
+  const missing = [];
+  (g.shows || []).forEach(s => (s.recent || []).forEach(e => e.problem && missing.push([s.show, e])));
+
+  /* The feed check (every 30 min, no player needed) is the up-to-date view of
+     what is missing. The last Preview adds what only rsync sees - chiefly old
+     episodes it would delete - unless a later sync has settled it. Episodes
+     the feed check already flags are not repeated. */
+  const pc = (s.preview_changes || {}).podcasts, st = settledBy(s, "podcasts");
+  const flagged = new Set(missing.map(([show, e]) => show + "/" + e.file));
+  const extra = !pc || (st && st.ago) ? {send: [], del: []}
+    : {send: (pc.send || []).filter(x => !flagged.has(x)), del: pc.delete || []};
+  const nPod = missing.length + extra.send.length + extra.del.length;
+  badge("#nPod", nPod);
+
+  if (g.stuck && g.stuck.length) h += `<div class="note bad"><div><b>${g.stuck.length} recent episode${g.stuck.length > 1 ? "s" : ""} not downloaded by Podgrab</b>
+    <ul>${g.stuck.map(s => `<li>${esc(s.show)} — ${esc(s.title)} (${s.days}d)</li>`).join("")}</ul></div></div>`;
+  if (!g.device_known) h += `<div class="note warn">The player has never been listed, so there is nothing to compare against. Wake it and refresh “On player”.</div>`;
+  else if (missing.length) h += `<div class="note warn"><div><b>${missing.length} episode${missing.length > 1 ? "s" : ""} missing from the player</b>
+    <ul>${missing.map(([s, e]) => `<li>${esc(s)} — ${esc(e.title)}</li>`).join("")}</ul></div></div>`;
+  else h += `<div class="note ok">${CHECK}<span>The player has every episode it should.</span></div>`;
+  if (st && st.failed) h += `<div class="note bad">The last sync (${st.failed}) failed for podcasts.</div>`;
+  if (extra.send.length || extra.del.length) h += `<div class="section" style="margin-bottom:12px">
+    <div class="sechead">Also in the last Preview<span class="sp"></span><span class="small muted">${ago(+s.preview.age_seconds)}</span></div>
+    ${changeGroups("ppx", extra.send, "send")}${changeGroups("ppx", extra.del, "del")}</div>`;
+
+  h += (g.shows || []).map(s => {
+    const rec = s.recent || [];
+    const dots = rec.map(e => `<i class="${e.on_device ? "on" : e.problem ? "miss" : ""}"></i>`).join("");
+    const rows = rec.map(e => {
+      const [cls, mark, why] = e.on_device ? ["on", "✓", "on player"] : e.expected ? ["miss", "✕", "missing"] : ["out", "·", "older than the keep rule"];
+      return `<li title="${why}"><span class="ic ${cls}">${mark}</span><span class="t">${esc(e.title)}</span><span class="when">${esc(e.date)}</span></li>`;
+    }).join("");
+    return `<details class="g" data-k="${esc(s.show)}"><summary>${CHEV}
+      <div class="gname"><b>${esc(s.show)}</b><span>${num(s.downloaded)} of ${num(s.feed_total)} downloaded${s.paused ? " · paused" : ""}</span></div>
+      <span class="dots">${dots}</span></summary><ul class="items">${rows || '<li class="muted">No downloaded episodes</li>'}</ul></details>`;
+  }).join("");
+  patch($("#pg"), h);
+}
+
+/* The file tree is big and changes only on a re-list, so it is fetched
+   separately, and only when the listing's timestamp moves. */
+let tree = null, treeStamp = null, libMode = "music";
+async function loadTree(stamp) {
+  if (stamp === treeStamp) return;
+  treeStamp = stamp;
+  tree = stamp ? await (await fetch("api/contents")).json() : null;
+  renderLib();
+}
+
+function renderLib() {
+  const m = tree && tree[libMode], q = $("#q").value.trim().toLowerCase();
+  const el = $("#lib");
+  if (!tree) return patch(el, `<div class="empty">Not listed yet — wake the player and tap Refresh.</div>`);
+  if (!m || !m.ok) return patch(el, `<div class="note bad">Could not list — ${esc((m && m.error) || "the player was busy or unreachable")}</div>`);
+  const keys = Object.keys(m.top || {}).sort((a, b) => a.localeCompare(b));
+  const html = keys.map(k => {
+    const g = m.top[k], subs = Object.keys(g.sub).sort((a, b) => a.localeCompare(b));
+    const hit = !q || k.toLowerCase().includes(q) || subs.some(s => s.toLowerCase().includes(q));
+    if (!hit) return "";
+    const albums = subs.filter(s => s).length;
+    const inner = subs.map(s => {
+      const x = g.sub[s], li = `<ul class="items">${x.names.map(n => `<li><span class="t">${esc(stripExt(n))}</span></li>`).join("")}</ul>`;
+      return s ? `<details class="g" data-k="${esc(libMode+k+"/"+s)}"><summary>${CHEV}<div class="gname"><b>${esc(s)}</b></div>
+        <span class="meta">${num(x.files)} · ${size(x.bytes)}</span></summary>${li}</details>` : li;
+    }).join("");
+    const sub = libMode === "music" ? `${albums} album${albums === 1 ? "" : "s"} · ${num(g.files)} tracks` : `${num(g.files)} episodes`;
+    return `<details class="g" data-k="${esc(libMode+k)}"${q && !k.toLowerCase().includes(q) ? " open" : ""}><summary>${CHEV}
+      <div class="gname"><b>${esc(k)}</b><span>${sub}</span></div><span class="meta">${size(g.bytes)}</span></summary>${inner}</details>`;
+  }).join("");
+  patch(el, html || `<div class="empty">Nothing matches “${esc(q)}”</div>`);
+}
+
+function renderLibHead(c) {
+  $("#libWhen").textContent = c ? "Listed " + ago(+c.age_seconds) : "Never listed";
+  const ok = c && c.music && c.music.ok && c.podcasts && c.podcasts.ok;
+  $("#libTotal").textContent = ok ? `${num(c.music.files + c.podcasts.files)} files · ${size(c.music.bytes + c.podcasts.bytes)}` : "On the player";
+}
+
+let state = null;
+function renderChrome(s) {
+  const up = s.player.up, run = s.running;
+  $("#host").textContent = "HiBy R1 · " + s.player.host;
+  const chip = $("#chip");
+  const label = {sync: "Syncing", preview: "Checking", listing: "Listing"}[run];
+  chip.className = "chip " + (run ? "busy" : up ? "up" : "");
+  chip.innerHTML = run ? `<span class="spin"></span><span>${label}…</span>` : `<span class="d"></span><span>${up ? "Awake" : "Asleep"}</span>`;
+
+  const busy = !!run, can = up && !busy;
+  const set = (id, text, spinning) => {
+    const b = $(id); b.disabled = !can;
+    b.innerHTML = spinning ? `<span class="spin"></span>${text}` : text;
+  };
+  set("#bPreview", run === "preview" ? "Checking…" : "Preview", run === "preview");
+  set("#bSync", run === "sync" ? "Syncing…" : "Sync now", run === "sync");
+  $("#bList").disabled = !can;
+  $("#bList").innerHTML = run === "listing" ? `<span class="spin"></span>Listing…` : "Refresh";
+  $("#hint").textContent = busy ? "" : up ? "" : "Player is asleep — showing its last known state";
+}
+
+async function tick() {
+  try {
+    const s = state = await (await fetch("api/state", {cache: "no-store"})).json();
+    renderChrome(s); renderLast(s); renderMusic(s); renderPodgrab(s); renderLibHead(s.contents);
+    loadTree(s.contents ? String(s.contents.generated) : null);
+  } catch (e) {
+    $("#chip").className = "chip"; $("#chip").innerHTML = `<span class="d"></span><span>Offline</span>`;
+  }
+}
+
+async function act(url, opts, msg) {
+  try { await fetch(url, opts); toast(msg); } catch { toast("Could not reach the server"); }
+  setTimeout(tick, 400);
+}
+$("#bPreview").onclick = () => act("api/preview", {method: "POST"}, "Checking what would change…");
+$("#bSync").onclick = () => act("sync", {}, "Sync started");
+$("#bList").onclick = () => act("api/contents", {method: "POST"}, "Listing the player…");
+$("#bFeeds").onclick = () => { act("api/podgrab", {method: "POST"}, "Checking feeds…"); setTimeout(tick, 1500); };
+
+/* Tabs, remembered in the URL so a reload lands on the same one. */
+function showTab(name) {
+  document.querySelectorAll("[role=tab]").forEach(t => t.setAttribute("aria-selected", t.dataset.tab === name));
+  document.querySelectorAll("[data-panel]").forEach(p => p.hidden = p.dataset.panel !== name);
+}
+document.querySelectorAll("[role=tab]").forEach(t => t.onclick = () => { history.replaceState(null, "", "#" + t.dataset.tab); showTab(t.dataset.tab); });
+const TABS = ["music", "podcasts", "library"];
+showTab(TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "music");
+
+document.querySelectorAll("#libSeg button").forEach(b => b.onclick = () => {
+  libMode = b.dataset.m;
+  document.querySelectorAll("#libSeg button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  $("#q").placeholder = libMode === "music" ? "Search artists and albums" : "Search shows";
+  renderLib();
+});
+$("#q").oninput = renderLib;
+
+/* Notification settings. The server never sends the HA token, only whether
+   it is set; the token itself lives in the container's environment. */
+const nForm = $("#nForm");
+function nRead() {
+  const o = {};
+  for (const el of nForm.elements) {
+    if (!el.name) continue;
+    o[el.name] = el.type === "checkbox" ? el.checked : el.type === "number" ? +el.value : el.value;
+  }
+  return o;
+}
+function nDeps() {
+  const v = nRead();
+  nForm.querySelectorAll("[data-if]").forEach(r => {
+    const [k, want] = r.dataset.if.split("=");
+    r.classList.toggle("dim", !v.enabled || (want ? v[k] !== want : !v[k]));
+  });
+}
+function nFill(info) {
+  const s = info.settings, ha = info.ha;
+  for (const el of nForm.elements) {
+    if (!el.name || !(el.name in s)) continue;
+    if (el.type === "checkbox") el.checked = s[el.name]; else el.value = s[el.name];
+  }
+  $("#nHa").innerHTML = ha.configured
+    ? `<div class="note ok" style="margin-top:12px">${CHECK}<span>Home Assistant · ${esc(ha.service)}${info.quiet_now ? " · quiet hours now" : ""}</span></div>`
+    : `<div class="note warn" style="margin-top:12px">HA_TOKEN is not set on the server. Add it to the container's environment and restart it.</div>`;
+  $("#bBell").classList.toggle("off", !ha.configured || !s.enabled);
+  nDeps();
+}
+nForm.addEventListener("input", nDeps);
+async function nLoad() {
+  try { nFill(await (await fetch("api/notify", {cache: "no-store"})).json()); } catch {}
+}
+$("#bBell").onclick = () => { nLoad(); $("#nDlg").showModal(); };
+$("#nSave").onclick = async () => {
+  try {
+    const r = await fetch("api/notify", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(nRead())});
+    nFill(await r.json()); $("#nDlg").close(); toast("Notifications saved");
+  } catch { toast("Could not save"); }
+};
+$("#nTest").onclick = async () => {
+  const b = $("#nTest"); b.disabled = true;
+  try { const r = await (await fetch("api/notify/test", {method: "POST"})).json(); toast(r.ok ? "Test sent — check your phone" : r.detail); }
+  catch { toast("Could not reach the server"); }
+  b.disabled = false;
+};
+nLoad();
+
+/* Poll while visible; stop when the tab or phone screen is off. */
+let timer;
+const start = () => { clearInterval(timer); tick(); timer = setInterval(tick, 3000); };
+document.addEventListener("visibilitychange", () => document.hidden ? clearInterval(timer) : start());
+start();
+</script>
+</body>
+</html>

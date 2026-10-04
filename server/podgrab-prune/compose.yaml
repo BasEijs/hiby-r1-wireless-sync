@@ -1,0 +1,31 @@
+# Age-based retention for Podgrab. Optional - see README.md.
+#
+#   docker compose up -d --build
+#
+# Must share Podgrab's Docker network to reach it by name (bottom of file).
+services:
+  podgrab-prune:
+    build: .
+    container_name: podgrab-prune
+    restart: unless-stopped
+    environment:
+      - PODGRAB_URL=${PODGRAB_URL:-http://podgrab:8080}
+      - MAX_AGE_DAYS=60
+      - KEEP_MIN=2             # never strip a show bare, however dormant
+      - INTERVAL_HOURS=24
+      # Starts SAFE: logs what it would delete and touches nothing.
+      # To arm it, set DRY_RUN=0 in the environment (or .env) and recreate
+      # the container. Left unset it stays at 1, so a fresh deploy never deletes.
+      - DRY_RUN=${DRY_RUN:-1}
+      - TZ=${TZ:-UTC}
+      # Runs silently. To get a message per cleanup, set both of:
+      #   GOTIFY_URL=http://gotify
+      #   GOTIFY_TOKEN=<app token>
+      # With either unset, notifications are skipped entirely.
+      - GOTIFY_URL=${GOTIFY_URL:-}
+      - GOTIFY_TOKEN=${GOTIFY_TOKEN:-}
+
+networks:
+  default:
+    external: true
+    name: ${PODGRAB_NETWORK:?set PODGRAB_NETWORK to the Docker network Podgrab is on}

@@ -1,0 +1,10 @@
+fw/
+venv/
+*.upt
+rootfs/
+__pycache__/
+.DS_Store
+build/
+.env
+state/
+CLAUDE.local.md

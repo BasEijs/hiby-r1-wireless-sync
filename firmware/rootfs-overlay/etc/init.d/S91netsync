@@ -1,0 +1,320 @@
+#!/bin/sh
+#
+# S91netsync - wireless sync services for the HiBy R1 (custom firmware)
+#
+# Started by /etc/init.d/rcS, which globs /etc/init.d/S??* and runs "$i start".
+# Note the filename has NO .sh extension: rcS *sources* anything matching *.sh
+# in its own shell, which would hang the boot. Non-.sh scripts are forked.
+#
+# Three rules shape this script.
+#
+# 1. It must return immediately.
+#    rcS runs init scripts sequentially, so any waiting done here delays
+#    S92_03_start_music_player and the player looks like it hung on boot.
+#    All real work happens in a detached supervisor loop.
+#
+# 2. It must never serve a module path whose mount has gone away.
+#    When the player is plugged in as USB mass storage the card is unmounted
+#    and the mount point collapses to an empty directory on the internal
+#    ubifs partition. Serving that would let a sync write the whole music
+#    library into a few MB of internal flash. The supervisor re-reads
+#    /proc/mounts every cycle and stops the daemon the moment the card
+#    leaves.
+#
+# 3. It must not hardcode the card's mount path.
+#    sys_server decides it at runtime. /data/mnt/sd_0 is what the binary
+#    contains, but only /proc/mounts knows the truth, so we read that.
+#
+# The daemon exposes ONLY two modules: music and podcasts. rsyncd addresses
+# modules, not paths, so no client request can name the card's book folder at
+# all. That protection is structural, not a filter. DO NOT add a module that
+# points at the card root.
+
+RSYNC=/usr/bin/rsync
+ADBD=/usr/bin/adbd
+CONF=/tmp/rsyncd.conf
+LOG=/tmp/netsync.log
+PIDFILE=/tmp/rsyncd.pid
+LOCKFILE=/tmp/rsyncd.lock
+
+# Only the sync server may talk to the daemon. The address is filled in at
+# build time by scripts/build-firmware.sh (SERVER_IP=...).
+ALLOW=@SERVER_IP@
+
+# Where to ask for a sync when one of the on-device gestures below fires.
+# wget is busybox's applet; failure is ignored, because the server also
+# polls for us as a fallback.
+TRIGGER_URL="http://@SERVER_IP@:8787/sync"
+TRIGGER_TIMEOUT=5
+
+# The sync button, such as it is.
+#
+# hiby_player is a closed binary with no plugin or scripting layer, so a real
+# menu entry would mean patching MIPS assembly. But the player writes each
+# playlist to its own file on the card:
+#
+#     <card>/playlist_data/<name>.m3u
+#
+# (verified on device; inside, it uses the firmware's own "a:\" card-root
+# convention, e.g. "a:\Music\Artist\01. Track.flac")
+#
+# So editing a playlist called SYNC in the player's own UI is a deliberate
+# on-device gesture we can watch for. Add or remove any track and a sync is
+# requested.
+TRIGGER_PLAYLIST="playlist_data/SYNC.m3u"
+STAMP_PLAYLIST=/tmp/netsync.playlist
+
+# Second, shallower button: opening the Tidal app.
+#
+# **[verified on device]** hiby_player touches /data/tat whenever the Tidal
+# app is opened - the contents never change, only the mtime. Confirmed twice,
+# 21:18 -> 21:23 -> 21:24. The file lives beside /data/tidal_info in the
+# binary's string table, which is how it was identified.
+#
+# Tidal is one tap from the main menu, where the playlist is several taps
+# deep. This only works if you never use Tidal on the player: for someone who
+# does, it fires on every visit. To switch it off, build with TIDAL_TRIGGER=0
+# (build-firmware.sh empties this line, and check_trigger skips a missing
+# file).
+TRIGGER_TIDAL=/data/tat
+STAMP_TIDAL=/tmp/netsync.tidal
+
+# /etc/services on this device has no rsync entry, so getservbyname() would
+# fail. Pass the port explicitly.
+PORT=873
+
+INTERVAL=15
+
+# Both switches live on the SD card, so they are reachable over USB mass
+# storage without reflashing:
+#   <card>/no_netsync   present -> do not run the rsync daemon at all
+#   <card>/enable_adb   present -> also start adbd on TCP 5555 (rescue shell)
+KILLSWITCH=no_netsync
+ADBSWITCH=enable_adb
+
+LAST=
+CARDLOG=
+
+log() {
+	# /tmp is a tmpfs on a 64MB device, so only log state *changes*.
+	[ "$1" = "$LAST" ] && return 0
+	LAST="$1"
+	echo "$(date '+%Y-%m-%d %H:%M:%S') $1" >> "$LOG"
+	[ -n "$CARDLOG" ] && echo "$(date '+%Y-%m-%d %H:%M:%S') $1" >> "$CARDLOG"
+	return 0
+}
+
+# One-shot dump of everything needed to diagnose a failed boot. Written to
+# /tmp immediately and mirrored onto the card as soon as the card is found,
+# so it can be read over USB mass storage WITHOUT needing a shell. v1 had no
+# such channel, which is why its failure could not be diagnosed on device.
+boot_report() {
+	{
+		echo "=== netsync boot report $(date) ==="
+		echo "--- /proc/mounts ---"
+		cat /proc/mounts
+		echo "--- card_mount() says: [$(card_mount)] ---"
+		echo "--- addresses ---"
+		ip -4 addr show 2>/dev/null || ifconfig 2>/dev/null
+		echo "--- candidate mount roots ---"
+		for d in /data/mnt /usr/data/mnt /mnt; do
+			echo "[$d]"
+			ls -la "$d" 2>&1
+		done
+		echo "--- rsync binary ---"
+		ls -l /usr/bin/rsync 2>&1
+		/usr/bin/rsync --version 2>&1 | head -2
+		echo "=== end report ==="
+	} >> "$LOG" 2>&1
+}
+
+# Mirror the log onto the card, once, as soon as its path is known.
+publish_log() {
+	[ -n "$CARDLOG" ] && return 0
+	CARDLOG="$1/netsync.log"
+	cp "$LOG" "$CARDLOG" 2>/dev/null
+	return 0
+}
+
+# The card's mount point, or empty if it is not mounted.
+#
+# v1 matched '^/data/mnt/sd' and never fired. sys_server mounts the card using
+# the literal path /data/mnt/sd_0, but /data is a SYMLINK to /usr/data, and the
+# kernel records the resolved path - so /proc/mounts spells it
+# /usr/data/mnt/sd_0. Matching a hardcoded prefix was the bug.
+#
+# Match on filesystem type plus a '/mnt/sd' fragment instead. That holds
+# whichever way the prefix is spelled.
+card_mount() {
+	awk '$3 ~ /^(vfat|exfat|texfat|fuseblk|msdos)$/ && $2 ~ /\/mnt\/sd/ { print $2; exit }' /proc/mounts
+}
+
+have_ip() {
+	# Interface-agnostic on purpose: wlan0 is what this firmware uses in
+	# practice, but wlan1 also appears in sys_server, so match any wlan*.
+	if command -v ip >/dev/null 2>&1; then
+		ip -4 addr show 2>/dev/null | grep -q 'inet .*wlan'
+	else
+		ifconfig 2>/dev/null | grep -A1 '^wlan' | grep -q 'inet addr'
+	fi
+}
+
+rsync_running() {
+	[ -f "$PIDFILE" ] || return 1
+	pid=$(cat "$PIDFILE" 2>/dev/null)
+	[ -n "$pid" ] && [ -d "/proc/$pid" ]
+}
+
+write_conf() {
+	# uid/gid are numeric on purpose: this rsync is static musl with no NSS,
+	# so name lookups would depend on /etc/passwd alone.
+	cat > "$CONF" <<CONFEOF
+pid file = $PIDFILE
+lock file = $LOCKFILE
+log file = /tmp/rsyncd.log
+use chroot = no
+uid = 0
+gid = 0
+hosts allow = $ALLOW
+hosts deny = *
+max connections = 1
+timeout = 600
+list = yes
+
+[music]
+    path = $1/Music
+    comment = music mirror
+    read only = no
+
+[podcasts]
+    path = $1/Podcasts
+    comment = podcast episodes
+    read only = no
+CONFEOF
+}
+
+# Ask the server for a sync. Called by check_trigger when a gesture is seen.
+trigger_sync() {
+	[ -n "$TRIGGER_URL" ] || return 0
+	wget -q -T "$TRIGGER_TIMEOUT" -O /dev/null "$TRIGGER_URL" 2>/dev/null \
+		&& log "sync requested from server" \
+		|| log "sync request failed (server will poll instead)"
+	return 0
+}
+
+# Fire when a trigger file has been touched since we last looked.
+#
+# /tmp is a tmpfs, so stamps are absent at boot: the first pass records the
+# current state WITHOUT triggering. Otherwise every power-on would sync, which
+# is precisely what this replaces.
+#
+# The device has no `stat`, so freshness is tested with `find -newer`.
+check_trigger() {
+	f="$1"
+	stamp="$2"
+	label="$3"
+
+	[ -f "$f" ] || return 0
+
+	if [ ! -f "$stamp" ]; then
+		touch "$stamp"
+		log "watching $label"
+		return 0
+	fi
+
+	if [ -n "$(find "$f" -newer "$stamp" 2>/dev/null)" ]; then
+		touch "$stamp"
+		log "$label - requesting a sync"
+		trigger_sync
+	fi
+	return 0
+}
+
+stop_rsync() {
+	if rsync_running; then
+		kill "$(cat "$PIDFILE")" 2>/dev/null
+		rm -f "$PIDFILE"
+		log "rsyncd stopped: $1"
+	else
+		log "idle: $1"
+	fi
+}
+
+maybe_start_adbd() {
+	# adbd on TCP 5555 has no working authentication on this device, so it is
+	# an unauthenticated root shell to the whole LAN. Off unless asked for.
+	#
+	# v2 started it unconditionally, deliberately, because v1 had gated the
+	# debugging channel on the very card detection that was broken. Card
+	# detection is now proven, and the boot report below is a diagnostic
+	# channel that needs no shell - so this goes back to opt-in.
+	#
+	# To enable: create a file called enable_adb in the card's root over USB.
+	[ -f /usr/data/disableadb ] && return 0
+	[ -n "$1" ] || return 0
+	[ -f "$1/$ADBSWITCH" ] || return 0
+	pidof adbd >/dev/null 2>&1 && return 0
+	# Neither /dev/android_adb nor /dev/usb-ffs/adb/ep0 exists, because
+	# T90adb does not match rcS's S??* glob and never runs. adbd therefore
+	# takes its TCP branch and listens on 5555. Ingenic's build logs
+	# "Using USB" just before doing so - the log string is mislabelled,
+	# ignore it. See docs/01-findings.md.
+	$ADBD >/dev/null 2>&1 &
+	log "adbd started, expect TCP 5555"
+}
+
+supervise() {
+	boot_report
+
+	while : ; do
+		card=$(card_mount)
+
+		[ -n "$card" ] && publish_log "$card"
+		maybe_start_adbd "$card"
+		if [ -n "$card" ]; then
+			# Either gesture asks for a sync. Both are things the user
+			# does deliberately and never by accident.
+			check_trigger "$TRIGGER_TIDAL" "$STAMP_TIDAL" "Tidal app opened"
+			check_trigger "$card/$TRIGGER_PLAYLIST" "$STAMP_PLAYLIST" "SYNC playlist edited"
+		fi
+
+		if [ -z "$card" ]; then
+			stop_rsync "no card mounted"
+		elif [ -f "$card/$KILLSWITCH" ]; then
+			stop_rsync "$KILLSWITCH present on card"
+		elif ! have_ip; then
+			stop_rsync "wlan0 has no address"
+		else
+			[ -d "$card/Music" ]    || mkdir -p "$card/Music"
+			[ -d "$card/Podcasts" ] || mkdir -p "$card/Podcasts"
+			if ! rsync_running; then
+				write_conf "$card"
+				$RSYNC --daemon --config="$CONF" --port="$PORT" >/dev/null 2>&1
+				log "rsyncd serving $card on port $PORT"
+				# Deliberately NOT triggering a sync here. Joining WiFi is
+				# not a request to sync; editing the SYNC playlist is.
+				# See check_playlist above.
+			fi
+		fi
+
+		sleep "$INTERVAL"
+	done
+}
+
+case "$1" in
+	start)
+		echo "Starting netsync..."
+		# Detached, so rcS continues to the music player at once.
+		supervise >/dev/null 2>&1 &
+		;;
+	stop)
+		stop_rsync "stop requested"
+		;;
+	restart|reload)
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart}"
+		exit 1
+esac
+
+exit 0

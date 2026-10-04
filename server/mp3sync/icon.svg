@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180">
+  <!-- Source for apple-touch-icon.png: the green HiBy R1, front view, mid-sync.
+       Full-bleed and opaque on purpose: iOS rounds the corners itself and
+       turns transparency into black.
+
+       Dark background so it suits both home-screen modes: iOS has no dark
+       variant for web-app icons (it keeps the image saved at Add to Home
+       Screen), so one icon has to work in light and dark.
+
+       Drawn from product photos of the green R1: 83.5 x 51.1 mm body, black
+       glass front with the screen in the top part and the HiBY wordmark
+       below it, a thin olive-green frame round the front edge, smoky
+       translucent sides, olive-green buttons on the right edge (power, then
+       two rockers). The wordmark is drawn as strokes, not text, so it
+       renders the same without fonts.
+
+       Render to a 180 x 180 PNG; the command is in the README. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#23281d"/>
+      <stop offset="1" stop-color="#0e100b"/>
+    </linearGradient>
+    <linearGradient id="frame" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#b7d157"/>
+      <stop offset="1" stop-color="#7c9a2c"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#16171a"/>
+      <stop offset="1" stop-color="#050506"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3b4a22"/>
+      <stop offset="1" stop-color="#141a0e"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".22"/>
+      <stop offset="0.4" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="blur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+  </defs>
+
+  <rect width="180" height="180" fill="url(#bg)"/>
+  <!-- a soft green glow behind the device, instead of a drop shadow -->
+  <rect x="44" y="15" width="92" height="150" rx="13" fill="#9cc23e" opacity=".35" filter="url(#blur)"/>
+
+  <!-- buttons on the right edge, behind the body -->
+  <g fill="#8fae35">
+    <rect x="133" y="42" width="6" height="10" rx="2"/>
+    <rect x="133" y="60" width="6" height="24" rx="2.5"/>
+    <rect x="133" y="92" width="6" height="24" rx="2.5"/>
+  </g>
+
+  <!-- body: green frame, smoky side, black glass -->
+  <rect x="44" y="15" width="92" height="150" rx="13" fill="url(#frame)"/>
+  <rect x="46.5" y="17.5" width="87" height="145" rx="11" fill="#3b3f37"/>
+  <rect x="48.5" y="19.5" width="83" height="141" rx="9.5" fill="url(#glass)"/>
+
+  <!-- screen -->
+  <rect x="52.5" y="24" width="75" height="117" rx="3" fill="url(#screen)"/>
+  <g transform="translate(90 74) scale(1.7) translate(-12 -12)"
+     fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+    <path d="M3 3v5h5"/>
+    <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+    <path d="M16 16h5v5"/>
+  </g>
+  <rect x="64" y="118" width="52" height="4" rx="2" fill="#fff" opacity=".2"/>
+  <rect x="64" y="118" width="33" height="4" rx="2" fill="#b7d157"/>
+  <circle cx="97" cy="120" r="3.6" fill="#fff"/>
+
+  <!-- HiBY wordmark below the screen -->
+  <g transform="translate(90 151) scale(1.25) translate(-9 -3)"
+     fill="none" stroke="#c9ccc4" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M0 0V6M4 0V6M0 3H4"/>
+    <path d="M6.5 0V6"/>
+    <path d="M9 0V6H11.4A1.5 1.5 0 0 0 11.4 3H9M9 0H11.1A1.5 1.5 0 0 1 11.1 3"/>
+    <path d="M14 0L16 3L18 0M16 3V6"/>
+  </g>
+
+  <!-- glass sheen -->
+  <rect x="48.5" y="19.5" width="83" height="141" rx="9.5" fill="url(#sheen)"/>
+</svg>
