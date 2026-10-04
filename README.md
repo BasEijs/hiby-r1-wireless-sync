@@ -109,3 +109,8 @@ Not affiliated with HiBy. You flash at your own risk.
 - [hiby-modding/hiby_os_crack](https://github.com/hiby-modding/hiby_os_crack)
   — the stock image, the repack script, and the install guide this builds on.
 - [rsync](https://rsync.samba.org/), 3.4.1, built static for MIPS.
+
+## License
+
+MIT — see `LICENSE`. This covers the code and docs in this repo, not the
+HiBy firmware it modifies or rsync (GPLv3), which keep their own terms.
